@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Full PAC — Host Control</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Grotesk:wght@400;500;600;700&family=DM+Mono:wght@400&display=swap" rel="stylesheet"/>
+<style>
+:root{--black:#050505;--deep:#0a0900;--surface:#0e0c00;--card:#141100;--border:#d4a0001a;--gb:#d4a00044;--gold:#d4a000;--gl:#f5c842;--white:#fff;--muted:#b89a50;--dim:#7a6520;--red:#ff3838;--green:#00c853;--orange:#ff9100;--fd:'Bebas Neue',sans-serif;--fb:'Space Grotesk',sans-serif;--fm:'DM Mono',monospace;--glow:0 0 30px #d4a00055}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:var(--black);color:var(--white);font-family:var(--fb);overflow-x:hidden}
+::-webkit-scrollbar{width:3px}::-webkit-scrollbar-thumb{background:var(--gold)}
+.app{display:grid;grid-template-rows:60px 1fr;height:100vh}
+.topbar{background:var(--deep);border-bottom:1px solid var(--gb);display:flex;align-items:center;justify-content:space-between;padding:0 20px;gap:12px;flex-wrap:wrap}
+.tb-logo{font-family:var(--fd);font-size:20px;letter-spacing:3px}.tb-logo span{color:var(--gold)}
+.tb-sub{font-family:var(--fm);font-size:9px;letter-spacing:3px;color:var(--muted);text-transform:uppercase}
+.tb-stats{display:flex;gap:10px}
+.tb-stat{display:flex;align-items:center;gap:5px;font-family:var(--fm);font-size:10px;color:var(--muted);background:var(--card);border:1px solid var(--border);padding:4px 10px}
+.tb-stat b{color:var(--gl)}
+.live-ind{display:flex;align-items:center;gap:6px;font-family:var(--fm);font-size:9px;letter-spacing:2px;color:var(--red);text-transform:uppercase}
+.ld{width:6px;height:6px;background:var(--red);border-radius:50%;animation:pulse 1s infinite}
+.content{display:grid;grid-template-columns:1fr 320px;height:calc(100vh - 60px);overflow:hidden}
+.main{overflow-y:auto;border-right:1px solid var(--border)}
+.side{overflow-y:auto}
+.panel{padding:18px 20px;border-bottom:1px solid var(--border)}
+.ph{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.pt{font-family:var(--fd);font-size:16px;letter-spacing:2px}
+.pb{font-family:var(--fm);font-size:8px;letter-spacing:2px;text-transform:uppercase;padding:2px 8px;border-radius:2px}
+.pb-live{background:#ff383818;border:1px solid #ff383844;color:var(--red)}
+/* BATTLE STAGE */
+.stage{display:grid;grid-template-columns:1fr 80px 1fr;gap:12px;align-items:center;margin-bottom:16px}
+.aslot{background:var(--card);border:1px solid var(--border);padding:16px;text-align:center;transition:all .3s;position:relative}
+.aslot.active{border-color:var(--gold);box-shadow:var(--glow)}
+.aslot-live{position:absolute;top:8px;left:8px;font-family:var(--fm);font-size:8px;letter-spacing:1px;color:var(--red);display:none}
+.aslot.active .aslot-live{display:block}
+.aav{font-size:32px;margin-bottom:6px}
+.an{font-family:var(--fd);font-size:18px;letter-spacing:1px;margin-bottom:2px}
+.ag{font-family:var(--fm);font-size:9px;color:var(--muted);letter-spacing:2px;margin-bottom:10px}
+.asc{font-family:var(--fd);font-size:36px;color:var(--gold);line-height:1;margin-bottom:2px}
+.al{font-family:var(--fm);font-size:8px;color:var(--dim);letter-spacing:2px;text-transform:uppercase;margin-bottom:10px}
+.abts{display:flex;gap:4px;justify-content:center;flex-wrap:wrap}
+.abt{font-family:var(--fm);font-size:8px;letter-spacing:1px;text-transform:uppercase;padding:5px 8px;border:1px solid var(--border);background:none;color:var(--muted);cursor:pointer;transition:all .2s}
+.abt.go:hover{border-color:var(--green);color:var(--green);background:#00c85318}
+.abt.mute:hover{border-color:var(--red);color:var(--red);background:#ff383818}
+.vsc{text-align:center}
+.vs{font-family:var(--fd);font-size:32px;color:var(--gold);text-shadow:var(--glow);margin-bottom:10px}
+.vbar{height:6px;background:var(--border);border-radius:3px;overflow:hidden;display:flex;margin-bottom:3px}
+.vba{background:linear-gradient(90deg,var(--gold),var(--gl));transition:width .5s;height:100%}
+.vbb{background:linear-gradient(90deg,#ffffff22,#ffffff44);transition:width .5s;height:100%}
+.vbls{display:flex;justify-content:space-between;font-family:var(--fm);font-size:9px;color:var(--muted)}
+.bctls{display:flex;gap:6px;flex-wrap:wrap}
+.cb{flex:1;font-family:var(--fm);font-size:9px;letter-spacing:1px;text-transform:uppercase;padding:9px 10px;border:1px solid var(--border);background:var(--surface);color:var(--muted);cursor:pointer;transition:all .2s;min-width:80px}
+.cb.d:hover{border-color:var(--red);color:var(--red);background:#ff383812}
+.cb.w:hover{border-color:var(--orange);color:var(--orange);background:#ff910012}
+.cb.s:hover{border-color:var(--green);color:var(--green);background:#00c85312}
+.empty-live{text-align:center;padding:36px 20px;color:var(--dim)}
+.ei{font-size:40px;margin-bottom:10px}.et{font-family:var(--fd);font-size:20px;letter-spacing:2px;margin-bottom:4px}.es{font-size:12px}
+/* TIMER */
+.timer-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;background:var(--surface);padding:14px 20px;border-bottom:1px solid var(--border)}
+.td{font-family:var(--fd);font-size:50px;color:var(--gold);line-height:1;min-width:110px;text-align:center;transition:color .3s}
+.td.urgent{color:var(--red);animation:blink .5s infinite}
+.tbtns{display:flex;flex-direction:column;gap:5px}
+.tbtn{font-family:var(--fm);font-size:9px;letter-spacing:1px;text-transform:uppercase;padding:7px 14px;border:1px solid var(--border);background:none;color:var(--muted);cursor:pointer;transition:all .2s}
+.tbtn.start{border-color:var(--green);color:var(--green)}.tbtn.start:hover{background:#00c85318}
+.tbtn.stop{border-color:var(--red);color:var(--red)}.tbtn.stop:hover{background:#ff383818}
+.tbtn:hover{border-color:var(--gold);color:var(--gold)}
+select{background:var(--card);border:1px solid var(--border);color:var(--white);font-family:var(--fm);font-size:10px;padding:6px 10px;outline:none}
+/* QUEUE */
+.qi{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border);background:var(--surface);transition:background .2s}
+.qi:hover{background:var(--card)}.qi.next{background:var(--card);border-left:3px solid var(--gold)}
+.qpos{font-family:var(--fd);font-size:16px;color:var(--dim);width:24px;text-align:center}.qi.next .qpos{color:var(--gold)}
+.qav{font-size:20px;flex-shrink:0}
+.qinfo{flex:1;min-width:0}.qn{font-size:12px;font-weight:600;margin-bottom:1px}.qg{font-family:var(--fm);font-size:9px;color:var(--muted)}
+.qst{font-family:var(--fm);font-size:8px;letter-spacing:1px;text-transform:uppercase;padding:2px 6px;border-radius:2px}
+.qst.waiting{background:var(--card);border:1px solid var(--border);color:var(--dim)}
+.qst.ready{background:#00c85318;border:1px solid #00c85333;color:var(--green)}
+.qacts{display:flex;gap:3px}
+.qb{font-family:var(--fm);font-size:8px;padding:4px 7px;border:1px solid var(--border);background:none;color:var(--dim);cursor:pointer;transition:all .2s}
+.qb.up:hover{border-color:var(--muted);color:var(--muted)}
+.qb.pull:hover{border-color:var(--gold);color:var(--gold);background:var(--card)}
+.qb.rm:hover{border-color:var(--red);color:var(--red)}
+.eq{text-align:center;padding:24px;color:var(--dim);font-family:var(--fm);font-size:12px}
+/* ADD FORM */
+.af{display:flex;flex-direction:column;gap:7px}
+.ar{display:flex;gap:7px}
+.fi{flex:1;background:var(--surface);border:1px solid var(--border);color:var(--white);font-family:var(--fb);font-size:12px;padding:9px 12px;outline:none;transition:border-color .2s}
+.fi:focus{border-color:var(--gold)}.fi::placeholder{color:var(--dim)}
+.ab{background:var(--gold);color:#000;font-family:var(--fm);font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;border:none;cursor:pointer;padding:9px 16px;transition:all .2s;white-space:nowrap}
+.ab:hover{background:var(--gl)}
+/* SIDE */
+.ss{border-bottom:1px solid var(--border);padding:14px}
+.sst{font-family:var(--fd);font-size:13px;letter-spacing:2px;color:var(--muted);margin-bottom:10px;display:flex;align-items:center;gap:7px}
+.sst::before{content:'';width:16px;height:1px;background:var(--gold)}
+.vfi{display:flex;align-items:center;gap:7px;padding:5px 0;border-bottom:1px solid var(--border);font-size:11px}
+.vc{font-family:var(--fm);font-size:9px;padding:2px 6px;border-radius:2px;font-weight:700}
+.vc.ca{background:var(--card);border:1px solid var(--gb);color:var(--gold)}
+.vc.cb{background:#ffffff08;border:1px solid #ffffff22;color:#fff}
+.vu{flex:1;color:var(--muted);font-size:10px}.vt{font-family:var(--fm);font-size:9px;color:var(--dim)}
+.vbtns{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:10px}
+.vc-btn{flex:1;font-family:var(--fm);font-size:8px;letter-spacing:1px;text-transform:uppercase;padding:7px 8px;border:1px solid var(--border);background:none;cursor:pointer;transition:all .2s;white-space:nowrap}
+.vc-btn.op{color:var(--green);border-color:var(--green)}.vc-btn.op:hover{background:#00c85318}
+.vc-btn.lk{color:var(--red);border-color:var(--red)}.vc-btn.lk:hover{background:#ff383818}
+.vc-btn.cl{color:var(--muted)}.vc-btn.cl:hover{border-color:var(--muted);color:var(--white)}
+.ainp{flex:1;background:var(--surface);border:1px solid var(--border);color:var(--white);font-family:var(--fb);font-size:11px;padding:7px 10px;outline:none}
+.ainp:focus{border-color:var(--gold)}.ainp::placeholder{color:var(--dim)}
+.asnd{background:var(--gold);color:#000;border:none;cursor:pointer;padding:7px 12px;font-family:var(--fm);font-size:9px;font-weight:700;letter-spacing:1px;text-transform:uppercase;white-space:nowrap}
+.ai{display:flex;justify-content:space-between;align-items:flex-start;padding:5px 0;border-bottom:1px solid var(--border);gap:6px}
+.at{font-size:11px;color:var(--muted);flex:1;line-height:1.4}.atm{font-family:var(--fm);font-size:9px;color:var(--dim);white-space:nowrap}
+.ae{font-size:11px;color:var(--dim);font-family:var(--fm)}
+.toast{position:fixed;bottom:20px;right:20px;background:var(--card);border:1px solid var(--gb);color:var(--white);font-family:var(--fm);font-size:11px;letter-spacing:1px;padding:10px 18px;z-index:999;opacity:0;transform:translateY(8px);transition:all .3s;max-width:280px}
+.toast.show{opacity:1;transform:translateY(0)}
+.toast.warn{border-color:#ff910044;color:var(--orange)}
+.toast.success{border-color:#00c85344;color:var(--green)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.4}}
+@media(max-width:700px){.content{grid-template-columns:1fr}.side{display:none}.stage{grid-template-columns:1fr 60px 1fr}}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="topbar">
+    <div><div class="tb-logo">FULL <span>PAC</span></div><div class="tb-sub">Host Control Room</div></div>
+    <div class="tb-stats">
+      <div class="tb-stat">👁 <b id="sv">0</b> viewers</div>
+      <div class="tb-stat">🗳 <b id="stv">0</b> votes</div>
+      <div class="tb-stat">🏆 <b id="stb">0</b> battles</div>
+    </div>
+    <div class="live-ind"><span class="ld"></span> HOST ACTIVE</div>
+  </div>
+  <div class="content">
+    <div class="main">
+      <!-- LIVE BATTLE -->
+      <div class="panel">
+        <div class="ph"><div class="pt">LIVE BATTLE</div><span class="pb pb-live">● ON AIR</span></div>
+        <div id="live-panel"><div class="empty-live"><div class="ei">🎙️</div><div class="et">No Battle Live</div><p class="es">Pull an artist from the queue below</p></div></div>
+      </div>
+      <!-- TIMER -->
+      <div class="timer-row">
+        <div id="td" class="td">02:00</div>
+        <div class="tbtns">
+          <button class="tbtn start" id="startBtn" onclick="startTimer()">▶ START</button>
+          <button class="tbtn stop" onclick="stopTimer()">⏸ PAUSE</button>
+          <button class="tbtn" onclick="resetTimer()">↺ RESET</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px">
+          <span style="font-family:var(--fm);font-size:9px;color:var(--dim)">ROUND TIME</span>
+          <select id="tpre"><option value="1">1 min</option><option value="2" selected>2 min</option><option value="3">3 min</option><option value="5">5 min</option></select>
+        </div>
+        <div style="margin-left:auto;text-align:right">
+          <a href="FullPAC_Battle_Live.html" target="_blank" style="font-family:var(--fm);font-size:9px;letter-spacing:2px;color:var(--gold);text-decoration:none;background:var(--card);border:1px solid var(--gb);padding:6px 12px;display:inline-block">↗ AUDIENCE VIEW</a>
+        </div>
+      </div>
+      <!-- QUEUE -->
+      <div class="panel">
+        <div class="ph"><div class="pt">BATTLE QUEUE</div><span class="pb" style="background:var(--card);border:1px solid var(--border);color:var(--muted)" id="qc">0 waiting</span></div>
+        <div id="ql"><div class="eq">Queue empty — add artists below</div></div>
+      </div>
+      <!-- ADD ARTIST -->
+      <div class="panel">
+        <div class="ph"><div class="pt">ADD ARTIST</div></div>
+        <div class="af">
+          <div class="ar">
+            <input class="fi" id="an" placeholder="Artist name *"/>
+            <input class="fi" id="ag" placeholder="Genre / Style"/>
+            <input class="fi" id="ae" placeholder="🎤" style="max-width:70px"/>
+          </div>
+          <div class="ar">
+            <input class="fi" id="ayt" placeholder="YouTube Live URL (e.g. youtube.com/live/xxxxx) — optional"/>
+          </div>
+          <div class="ar">
+            <select class="fi" id="as" style="flex:none;width:auto"><option>Freestyle Battle</option><option>Beat Battle</option><option>Beatbox</option><option>Voiceover</option><option>Rap Cipher</option></select>
+            <button class="ab" onclick="addArtist()">+ ADD TO QUEUE</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- SIDE -->
+    <div class="side">
+      <div class="ss">
+        <div class="sst">Live Vote Feed</div>
+        <div class="vbtns">
+          <button class="vc-btn op" onclick="unlockVotes()">✓ Open</button>
+          <button class="vc-btn lk" onclick="lockVotes()">✕ Lock</button>
+          <button class="vc-btn cl" onclick="clearVotes()">↺ Clear</button>
+        </div>
+        <div id="vf"><div class="ae">No votes yet</div></div>
+      </div>
+      <div class="ss">
+        <div class="sst">Announcements</div>
+        <div style="display:flex;gap:5px;margin-bottom:8px">
+          <input class="ainp" id="ann" placeholder="Message to audience..." onkeydown="if(event.key==='Enter')sendAnn()"/>
+          <button class="asnd" onclick="sendAnn()">SEND</button>
+        </div>
+        <div id="annl"><div class="ae">No announcements</div></div>
+      </div>
+      <div class="ss">
+        <div class="sst">Quick Actions</div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <button class="cb w" onclick="nextRound()" style="text-align:left;width:100%">⏭ Next Round</button>
+          <button class="cb d" onclick="endBattle()" style="text-align:left;width:100%">⏹ End Battle</button>
+          <button class="cb s" onclick="unlockVotes()" style="text-align:left;width:100%">✓ Open Voting</button>
+          <button class="cb" onclick="clearVotes()" style="text-align:left;width:100%;border-color:var(--muted)">↺ Reset Votes</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import{initializeApp}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import{getDatabase,ref,set,get,push,onValue,update,remove,serverTimestamp}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+const cfg={apiKey:"AIzaSyDBhhAl3L5NSy-vs6kqk4W8c2XMQnsaLP4",authDomain:"fullpacentertainment-73f8f.firebaseapp.com",databaseURL:"https://fullpacentertainment-73f8f-default-rtdb.firebaseio.com",projectId:"fullpacentertainment-73f8f",storageBucket:"fullpacentertainment-73f8f.firebasestorage.app",messagingSenderId:"680781752185",appId:"1:680781752185:web:4ceb73f0e73c1823be71a8"};
+const app=initializeApp(cfg);
+const db=getDatabase(app);
+const e=id=>document.getElementById(id);
+let timerSec=120,timerRunning=false,timerInt=null;
+
+function toast(msg,type='info'){const t=document.createElement('div');t.className=`toast ${type}`;t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.classList.add('show'),10);setTimeout(()=>{t.classList.remove('show');setTimeout(()=>t.remove(),300)},3000)}
+function timeAgo(ts){if(!ts)return'';const d=Math.floor((Date.now()-ts)/1000);return d<60?d+'s ago':d<3600?Math.floor(d/60)+'m ago':Math.floor(d/3600)+'h ago'}
+function updateTimer(){const m=Math.floor(timerSec/60),s=timerSec%60;const el=e('td');if(el){el.textContent=`${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;el.className='td'+(timerSec<=10&&timerRunning?' urgent':'')}}
+
+// LISTENERS
+onValue(ref(db,'battle/live'),snap=>{renderLive(snap.val())});
+onValue(ref(db,'battle/queue'),snap=>{renderQueue(snap.val())});
+onValue(ref(db,'battle/votes'),snap=>{renderVotes(snap.val())});
+onValue(ref(db,'battle/timer'),snap=>{const t=snap.val();if(t){timerSec=t.seconds||0;timerRunning=t.running||false;updateTimer()}});
+onValue(ref(db,'battle/announcements'),snap=>{renderAnns(snap.val())});
+onValue(ref(db,'battle/stats'),snap=>{const s=snap.val()||{};e('sv').textContent=s.viewers||0;e('stv').textContent=s.totalVotes||0;e('stb').textContent=s.battlesCompleted||0});
+
+function renderLive(b){
+  const p=e('live-panel');
+  if(!b){p.innerHTML=`<div class="empty-live"><div class="ei">🎙️</div><div class="et">No Battle Live</div><p class="es">Pull an artist from the queue below</p></div>`;return}
+  p.innerHTML=`
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+    <div class="live-ind" style="display:flex;align-items:center;gap:5px"><span class="ld"></span><span style="font-family:var(--fm);font-size:9px;letter-spacing:2px;color:var(--red)">LIVE</span></div>
+    <span style="font-family:var(--fm);font-size:9px;letter-spacing:2px;color:var(--gold);background:var(--card);border:1px solid var(--gb);padding:2px 8px">${b.type||'Freestyle Battle'}</span>
+    <span style="font-family:var(--fm);font-size:9px;color:var(--muted);margin-left:auto">Round ${b.round||1}</span>
+  </div>
+  <div class="stage">
+    <div class="aslot${b.artistA?.active?' active':''}">
+      <div class="aslot-live">● LIVE</div>
+      <div class="aav">${b.artistA?.emoji||'🎤'}</div>
+      <div class="an">${b.artistA?.name||'Artist A'}</div>
+      <div class="ag">${b.artistA?.genre||'—'}</div>
+      <div class="asc" id="sca">0</div><div class="al">VOTES</div>
+      <div class="abts">
+        <button class="abt go" onclick="window.setActive('A')">🎤 LIVE</button>
+        <button class="abt mute" onclick="window.muteA('A')">🔇 MUTE</button>
+      </div>
+    </div>
+    <div class="vsc">
+      <div class="vs">VS</div>
+      <div class="vbar"><div class="vba" id="spa" style="width:50%"></div><div class="vbb" id="spb" style="width:50%"></div></div>
+      <div class="vbls"><span id="pa">50%</span><span id="pb">50%</span></div>
+    </div>
+    <div class="aslot${b.artistB?.active?' active':''}">
+      <div class="aslot-live">● LIVE</div>
+      <div class="aav">${b.artistB?.emoji||'🎤'}</div>
+      <div class="an">${b.artistB?.name||'Artist B'}</div>
+      <div class="ag">${b.artistB?.genre||'—'}</div>
+      <div class="asc" id="scb">0</div><div class="al">VOTES</div>
+      <div class="abts">
+        <button class="abt go" onclick="window.setActive('B')">🎤 LIVE</button>
+        <button class="abt mute" onclick="window.muteA('B')">🔇 MUTE</button>
+      </div>
+    </div>
+  </div>
+  <div class="bctls">
+    <button class="cb d" onclick="window.endBattle()">⏹ END</button>
+    <button class="cb w" onclick="window.nextRound()">⏭ NEXT ROUND</button>
+    <button class="cb s" onclick="window.declareWinner('A')">🏆 A WINS</button>
+    <button class="cb s" onclick="window.declareWinner('B')">🏆 B WINS</button>
+  </div>`;
+}
+
+function renderQueue(q){
+  const l=e('ql');const qc=e('qc');
+  if(!q){l.innerHTML=`<div class="eq">Queue empty — add artists below</div>`;if(qc)qc.textContent='0 waiting';return}
+  const items=Object.entries(q).sort((a,b)=>(a[1].position||0)-(b[1].position||0));
+  if(qc)qc.textContent=`${items.length} waiting`;
+  l.innerHTML=items.map(([id,a],i)=>`
+  <div class="qi${i===0?' next':''}">
+    <div class="qpos">${i===0?'▶':i+1}</div>
+    <div class="qav">${a.emoji||'🎤'}</div>
+    <div class="qinfo"><div class="qn">${a.name}</div><div class="qg">${a.genre||'—'} · ${a.style||'Freestyle'}</div></div>
+    <div class="qst ${a.status||'waiting'}">${a.status||'waiting'}</div>
+    <div class="qacts">
+      <button class="qb up" onclick="window.moveUp('${id}')">↑</button>
+      <button class="qb pull" onclick="window.pullArtist('${id}')">▶ PULL</button>
+      <button class="qb rm" onclick="window.removeQ('${id}')">✕</button>
+    </div>
+  </div>`).join('')
+}
+
+function renderVotes(v){
+  if(!v)return;
+  const va=Object.values(v).filter(x=>x.choice==='A').length;
+  const vb=Object.values(v).filter(x=>x.choice==='B').length;
+  const tot=va+vb||1;
+  const pa=Math.round((va/tot)*100);
+  const pb=100-pa;
+  const els=['sca','scb','pa','pb','spa','spb'];
+  if(e('sca'))e('sca').textContent=va;
+  if(e('scb'))e('scb').textContent=vb;
+  if(e('pa'))e('pa').textContent=pa+'%';
+  if(e('pb'))e('pb').textContent=pb+'%';
+  if(e('spa'))e('spa').style.width=pa+'%';
+  if(e('spb'))e('spb').style.width=pb+'%';
+  const f=e('vf');
+  if(f){
+    const r=Object.entries(v).slice(-6).reverse();
+    f.innerHTML=r.map(([,x])=>`<div class="vfi"><span class="vc ${x.choice==='A'?'ca':'cb'}">${x.choice==='A'?'▲ A':'▲ B'}</span><span class="vu">${x.user||'Fan'}</span><span class="vt">${timeAgo(x.timestamp)}</span></div>`).join('')||'<div class="ae">No votes yet</div>';
+    update(ref(db,'battle/stats'),{totalVotes:va+vb});
+  }
+}
+
+function renderAnns(data){
+  const l=e('annl');if(!l)return;
+  if(!data){l.innerHTML='<div class="ae">No announcements</div>';return}
+  const items=Object.entries(data).sort((a,b)=>b[1].timestamp-a[1].timestamp).slice(0,5);
+  l.innerHTML=items.map(([,a])=>`<div class="ai"><span class="at">${a.text}</span><span class="atm">${timeAgo(a.timestamp)}</span></div>`).join('')||'<div class="ae">No announcements</div>'
+}
+
+// TIMER
+window.startTimer=async()=>{
+  if(timerRunning)return;
+  timerRunning=true;
+  await update(ref(db,'battle/timer'),{running:true,seconds:timerSec,startedAt:serverTimestamp()});
+  timerInt=setInterval(()=>{
+    if(timerSec<=0){window.stopTimer();return}
+    timerSec--;updateTimer();
+    update(ref(db,'battle/timer'),{seconds:timerSec});
+  },1000);
+};
+window.stopTimer=async()=>{
+  timerRunning=false;clearInterval(timerInt);
+  await update(ref(db,'battle/timer'),{running:false,seconds:timerSec});
+  updateTimer();
+};
+window.resetTimer=async()=>{
+  await window.stopTimer();
+  const m=parseInt(e('tpre').value)||2;
+  timerSec=m*60;
+  await update(ref(db,'battle/timer'),{running:false,seconds:timerSec});
+  updateTimer();
+};
+
+// BATTLE ACTIONS
+window.pullArtist=async(id)=>{
+  const snap=await get(ref(db,`battle/queue/${id}`));
+  const a=snap.val();if(!a)return;
+  const ls=await get(ref(db,'battle/live'));const live=ls.val();
+  if(!live){
+    await set(ref(db,'battle/live'),{type:a.style||'Freestyle Battle',round:1,status:'live',startedAt:serverTimestamp(),artistA:{...a,active:true},artistB:null});
+    toast(`${a.name} pulled to Slot A`);
+  }else if(!live.artistB){
+    await update(ref(db,'battle/live'),{artistB:{...a,active:false}});
+    toast(`${a.name} pulled to Slot B — BATTLE ON! 🔥`,'success');
+  }else{toast('Both slots full — end battle first','warn');return}
+  await remove(ref(db,`battle/queue/${id}`));
+};
+window.setActive=async(side)=>{
+  await update(ref(db,'battle/live'),{[`artist${side}.active`]:true,[`artist${side==='A'?'B':'A'}.active`]:false});
+  toast(`Artist ${side} is now LIVE 🎤`);
+};
+window.muteA=async(side)=>{
+  await update(ref(db,`battle/live/artist${side}`),{muted:true});
+  toast(`Artist ${side} muted`);
+};
+window.nextRound=async()=>{
+  const s=await get(ref(db,'battle/live/round'));
+  const r=(s.val()||1)+1;
+  await update(ref(db,'battle/live'),{round:r});
+  await set(ref(db,'battle/votes'),null);
+  toast(`Round ${r} started — votes reset`);
+};
+window.declareWinner=async(side)=>{
+  const s=await get(ref(db,'battle/live'));const b=s.val();
+  const w=b?.[`artist${side}`];if(!w)return;
+  await update(ref(db,'battle/live'),{status:'ended',winner:w.name,winnerSide:side});
+  const cs=await get(ref(db,'battle/stats/battlesCompleted'));
+  await update(ref(db,'battle/stats'),{battlesCompleted:(cs.val()||0)+1});
+  toast(`🏆 ${w.name} declared WINNER!`,'success');
+  setTimeout(()=>window.endBattle(),3000);
+};
+window.endBattle=async()=>{
+  await set(ref(db,'battle/live'),null);
+  await set(ref(db,'battle/votes'),null);
+  await update(ref(db,'battle/timer'),{running:false,seconds:0});
+  clearInterval(timerInt);timerRunning=false;timerSec=0;updateTimer();
+  toast('Battle ended');
+};
+window.moveUp=async(id)=>{
+  const s=await get(ref(db,'battle/queue'));const q=s.val();if(!q)return;
+  const items=Object.entries(q).sort((a,b)=>(a[1].position||0)-(b[1].position||0));
+  const idx=items.findIndex(([k])=>k===id);if(idx<=0)return;
+  const u={};u[`battle/queue/${items[idx][0]}/position`]=idx-1;u[`battle/queue/${items[idx-1][0]}/position`]=idx;
+  await update(ref(db),u);
+};
+window.removeQ=async(id)=>{await remove(ref(db,`battle/queue/${id}`));toast('Removed from queue')};
+window.addArtist=async()=>{
+  const name=e('an').value.trim();const genre=e('ag').value.trim();const style=e('as').value;const emoji=e('ae').value||'🎤';const youtubeUrl=e('ayt').value.trim();
+  if(!name){toast('Enter artist name','warn');return}
+  const s=await get(ref(db,'battle/queue'));const ex=s.val()||{};
+  await push(ref(db,'battle/queue'),{name,genre,style,emoji,youtubeUrl,position:Object.keys(ex).length,status:'waiting',addedAt:serverTimestamp()});
+  e('an').value='';e('ag').value='';e('ayt').value='';
+  toast(`${name} added to queue`);
+};
+window.lockVotes=async()=>{await update(ref(db,'battle/settings'),{votingOpen:false});toast('Voting LOCKED 🔒')};
+window.unlockVotes=async()=>{await update(ref(db,'battle/settings'),{votingOpen:true});toast('Voting OPEN ✓','success')};
+window.clearVotes=async()=>{await set(ref(db,'battle/votes'),null);toast('Votes cleared')};
+window.sendAnn=async()=>{
+  const text=e('ann').value.trim();if(!text)return;
+  await push(ref(db,'battle/announcements'),{text,timestamp:Date.now()});
+  e('ann').value='';toast('Announcement sent 📢');
+};
+timerSec=120;updateTimer();
+</script>
+</body>
+</html>
