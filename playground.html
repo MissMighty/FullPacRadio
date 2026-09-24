@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<meta name="description" content="Full PAC Playground — submit your YouTube performance for the live battle queue."/>
+<title>Full PAC — Playground</title>
+<style>
+:root{--black:#050505;--deep:#0a0900;--surface:#0e0c00;--card:#141100;--border:#d4a00044;--gold:#d4a000;--gl:#f5c842;--white:#fff;--muted:#b89a50;--dim:#7a6520;--green:#00c853;--red:#ff3838}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 50% 0,#2b2200 0,#0a0900 32%,#050505 72%);color:var(--white);font-family:Arial,Helvetica,sans-serif;min-height:100vh}
+a{color:inherit}.wrap{width:min(940px,calc(100% - 32px));margin:auto}.top{display:flex;justify-content:space-between;align-items:center;padding:20px 0;border-bottom:1px solid var(--border);gap:16px}.brand{font-weight:900;letter-spacing:2px;color:var(--gold)}.nav{display:flex;gap:16px;flex-wrap:wrap}.nav a{font-size:12px;text-decoration:none;color:var(--muted)}.nav a:hover{color:var(--gl)}
+.hero{text-align:center;padding:64px 0 34px}.eyebrow{font-size:11px;letter-spacing:4px;text-transform:uppercase;color:var(--gold);font-weight:800}.hero h1{font-size:clamp(46px,10vw,94px);line-height:.9;margin:12px 0 18px;letter-spacing:1px}.hero p{max-width:650px;margin:auto;color:var(--muted);line-height:1.65;font-size:15px}.flow{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:28px 0 0}.step{border:1px solid var(--border);background:#141100aa;padding:12px 8px;text-align:center;font-size:11px;color:var(--muted)}.step b{display:block;color:var(--gl);margin-bottom:4px;font-size:12px}
+.grid{display:grid;grid-template-columns:1.35fr .65fr;gap:18px;padding:10px 0 60px}.card{background:linear-gradient(180deg,#151100,#0c0a00);border:1px solid var(--border);padding:24px}.card h2{margin:0 0 5px;font-size:24px}.sub{color:var(--muted);font-size:13px;line-height:1.5;margin-bottom:22px}.field{margin-bottom:16px}.field label{display:block;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:7px}.field input,.field select{width:100%;background:#070700;border:1px solid var(--border);color:var(--white);padding:13px 12px;font-size:14px;outline:none}.field input:focus,.field select:focus{border-color:var(--gold)}.row{display:grid;grid-template-columns:1fr 1fr;gap:12px}.check{display:flex;gap:10px;align-items:flex-start;color:var(--muted);font-size:12px;line-height:1.5;margin:18px 0}.check input{margin-top:3px}.submit{width:100%;border:1px solid var(--gold);background:var(--gold);color:#090700;padding:14px 16px;font-size:12px;font-weight:900;letter-spacing:2px;text-transform:uppercase;cursor:pointer}.submit:hover{background:var(--gl)}.submit:disabled{opacity:.55;cursor:wait}
+.status{border:1px solid var(--border);padding:16px;margin-top:16px;display:none}.status.show{display:block}.status strong{display:block;margin-bottom:5px}.status p{margin:0;color:var(--muted);font-size:12px;line-height:1.5}.ok{border-color:#00c85366}.err{border-color:#ff383866}.side-title{font-size:11px;letter-spacing:3px;color:var(--gold);text-transform:uppercase;margin-bottom:14px}.rules{margin:0;padding-left:18px;color:var(--muted);font-size:13px;line-height:1.7}.rules li{margin-bottom:9px}.watch{display:block;text-align:center;text-decoration:none;border:1px solid var(--gold);padding:12px;margin-top:20px;color:var(--gl);font-size:11px;letter-spacing:2px;text-transform:uppercase}.receipt{font-family:monospace;color:var(--gl);word-break:break-all}.foot{text-align:center;color:var(--dim);font-size:11px;padding:0 0 30px}
+@media(max-width:720px){.grid{grid-template-columns:1fr}.flow{grid-template-columns:1fr}.row{grid-template-columns:1fr}.top{align-items:flex-start;flex-direction:column}.hero{padding-top:42px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="top"><div class="brand">FULL PAC · PLAYGROUND</div><nav class="nav"><a href="index.html">Home</a><a href="battle.html">Watch Battle</a><a href="vote.html">Vote</a></nav></header>
+<section class="hero">
+  <div class="eyebrow">Creator Entry</div>
+  <h1>ENTER THE<br>PLAYGROUND</h1>
+  <p>Bring your performance to Full PAC. Submit a YouTube video or live-stream link, enter the battle queue, and wait for the host to pull you onto the live stage.</p>
+  <div class="flow"><div class="step"><b>01</b>Submit</div><div class="step"><b>02</b>Queue</div><div class="step"><b>03</b>Host</div><div class="step"><b>04</b>Battle</div><div class="step"><b>05</b>Vote</div></div>
+</section>
+<main class="grid">
+  <section class="card">
+    <h2>Creator Submission</h2><div class="sub">Your entry goes directly to the Full PAC Firebase battle queue for Host Control.</div>
+    <form id="entryForm" novalidate>
+      <div class="field"><label for="artistName">Artist / Creator Name *</label><input id="artistName" maxlength="60" autocomplete="nickname" required placeholder="Your stage or creator name"/></div>
+      <div class="row">
+        <div class="field"><label for="genre">Genre</label><input id="genre" maxlength="40" placeholder="House, Hip-Hop, R&B…"/></div>
+        <div class="field"><label for="style">Battle Type *</label><select id="style" required><option>Freestyle Battle</option><option>Beat Battle</option><option>DJ Battle</option><option>Producer Battle</option><option>Live Performance</option></select></div>
+      </div>
+      <div class="field"><label for="youtubeUrl">YouTube Video / Live URL *</label><input id="youtubeUrl" type="url" inputmode="url" required placeholder="https://youtube.com/watch?v=..."/></div>
+      <div class="field"><label for="emoji">Stage Icon</label><select id="emoji"><option>🎤</option><option>🎧</option><option>🎹</option><option>🎸</option><option>🔥</option><option>⚡</option></select></div>
+      <label class="check"><input id="rights" type="checkbox" required/><span>I confirm I have the right or permission to submit this performance/link to the Full PAC Playground.</span></label>
+      <button class="submit" id="submitBtn" type="submit">Submit to Playground</button>
+    </form>
+    <div id="statusBox" class="status" role="status" aria-live="polite"><strong id="statusTitle"></strong><p id="statusText"></p></div>
+  </section>
+  <aside class="card">
+    <div class="side-title">How it works</div>
+    <ol class="rules"><li>Use a valid public YouTube video, Short, or live-stream link.</li><li>Your submission enters the host queue; submitting does not automatically put you live.</li><li>The host controls who is pulled into Slot A or Slot B.</li><li>Once live, viewers can watch and vote through the Battle Arena.</li><li>Keep this page open if you want to see your queue status change.</li></ol>
+    <a class="watch" href="battle.html">Watch Battle Arena →</a>
+    <div id="savedStatus" class="status"><strong>Previous submission</strong><p id="savedText"></p></div>
+  </aside>
+</main>
+<div class="foot">FULL PAC ENTERTAINMENT · PLAYGROUND</div>
+</div>
+<script type="module">
+import{initializeApp}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import{getDatabase,ref,push,set,onValue,serverTimestamp}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+const cfg={apiKey:"AIzaSyDBhhAl3L5NSy-vs6kqk4W8c2XMQnsaLP4",authDomain:"fullpacentertainment-73f8f.firebaseapp.com",databaseURL:"https://fullpacentertainment-73f8f-default-rtdb.firebaseio.com",projectId:"fullpacentertainment-73f8f",storageBucket:"fullpacentertainment-73f8f.firebasestorage.app",messagingSenderId:"680781752185",appId:"1:680781752185:web:4ceb73f0e73c1823be71a8"};
+const db=getDatabase(initializeApp(cfg));
+const $=id=>document.getElementById(id);
+const form=$('entryForm'),btn=$('submitBtn'),box=$('statusBox'),title=$('statusTitle'),msg=$('statusText');
+let submissionSeen=false,unsub=null;
+function safeText(v,max){return String(v||'').replace(/[<>&]/g,'').replace(/[\u0000-\u001F\u007F]/g,'').trim().slice(0,max)}
+function youtubeId(raw){
+  try{
+    const u=new URL(raw.trim()); const h=u.hostname.replace(/^www\./,'').toLowerCase();
+    if(h==='youtu.be') return u.pathname.split('/').filter(Boolean)[0]||null;
+    if(h==='youtube.com'||h==='m.youtube.com'||h==='music.youtube.com'){
+      if(u.pathname==='/watch') return u.searchParams.get('v');
+      const p=u.pathname.split('/').filter(Boolean); if(['live','embed','shorts'].includes(p[0]))return p[1]||null;
+    }
+  }catch(e){} return null;
+}
+function canonicalYoutube(raw){const id=youtubeId(raw);return id&&/^[\w-]{11}$/.test(id)?`https://www.youtube.com/watch?v=${id}`:null}
+function show(kind,head,text){box.className='status show '+kind;title.textContent=head;msg.textContent=text}
+function watchSubmission(key,name){
+  if(unsub)unsub(); const r=ref(db,`battle/queue/${key}`);
+  unsub=onValue(r,s=>{
+    const saved=$('savedStatus'),out=$('savedText');
+    if(s.exists()){submissionSeen=true;saved.className='status show ok';out.textContent=`${name} is in the battle queue. Submission ID: ${key}`}
+    else if(submissionSeen){saved.className='status show';out.textContent=`${name} is no longer in the waiting queue. Check the Battle Arena for the current stage.`}
+  },()=>{});
+}
+const prior=localStorage.getItem('fullpacPlaygroundSubmission');
+if(prior){try{const x=JSON.parse(prior);if(x.key&&x.name)watchSubmission(x.key,x.name)}catch(e){}}
+form.addEventListener('submit',async ev=>{
+  ev.preventDefault();
+  const name=safeText($('artistName').value,60),genre=safeText($('genre').value,40),style=$('style').value,emoji=$('emoji').value;
+  const youtubeUrl=canonicalYoutube($('youtubeUrl').value);
+  if(!name){show('err','Artist name required','Enter your artist or creator name.');return}
+  if(!youtubeUrl){show('err','Valid YouTube link required','Use a public YouTube video, Short, embed, or live-stream URL.');return}
+  if(!$('rights').checked){show('err','Confirmation required','Confirm that you have permission to submit the performance/link.');return}
+  btn.disabled=true;btn.textContent='Submitting…';
+  try{
+    const q=push(ref(db,'battle/queue'));
+    await set(q,{name,genre,style,emoji,youtubeUrl,position:Date.now(),status:'waiting',source:'playground',addedAt:serverTimestamp()});
+    localStorage.setItem('fullpacPlaygroundSubmission',JSON.stringify({key:q.key,name}));
+    submissionSeen=true;watchSubmission(q.key,name);
+    show('ok','You’re in the queue',`${name} was submitted to the Full PAC Playground. Submission ID: ${q.key}`);
+    form.reset();
+  }catch(err){
+    console.error(err);show('err','Submission did not go through','Firebase did not accept the entry. The Playground may not be open for public submissions yet.');
+  }finally{btn.disabled=false;btn.textContent='Submit to Playground'}
+});
+</script>
+</body>
+</html>
