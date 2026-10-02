@@ -49,7 +49,8 @@ a{color:var(--gold);text-decoration:none} .brand{font-weight:900;letter-spacing:
 </main>
 <script type="module">
 import{initializeApp}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import{getDatabase,ref,onValue,push,set,onDisconnect,update}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import{getDatabase,ref,onValue,push,set,onDisconnect}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import{getAuth,signInAnonymously,onAuthStateChanged}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 const cfg={
   apiKey:"AIzaSyDBhhAl3L5NSy-vs6kqk4W8c2XMQnsaLP4",
   authDomain:"fullpacentertainment-73f8f.firebaseapp.com",
@@ -59,42 +60,41 @@ const cfg={
   messagingSenderId:"680781752185",
   appId:"1:680781752185:web:4ceb73f0e73c1823be71a8"
 };
-const db=getDatabase(initializeApp(cfg)), el=id=>document.getElementById(id);
+const app=initializeApp(cfg),db=getDatabase(app),auth=getAuth(app),el=id=>document.getElementById(id);
 
-// Reliable Firebase presence for the public battle audience.
-// Each open Battle page gets its own connection record. Firebase removes it
-// server-side on disconnect, including dropped mobile connections.
+// Public viewers own only their own connection records. They never write shared stats.
 const presenceRef=ref(db,'battle/presence');
-onValue(ref(db,'.info/connected'),async snap=>{
-  if(snap.val()!==true)return;
-  const connectionRef=push(presenceRef);
+let connectionRef=null,connected=false,presenceVersion=0,presencePending=false;
+async function connectPresence(){
+  if(!connected || !auth.currentUser || connectionRef || presencePending)return;
+  presencePending=true;
+  const uid=auth.currentUser.uid,version=presenceVersion,record=push(presenceRef);
   try{
-    await onDisconnect(connectionRef).remove();
-    await set(connectionRef,{connectedAt:Date.now()});
-  }catch(err){
-    console.warn('Viewer presence unavailable',err);
-  }
+    await onDisconnect(record).remove();
+    if(version!==presenceVersion || !connected || auth.currentUser?.uid!==uid){await onDisconnect(record).cancel();return}
+    await set(record,{uid,connectedAt:Date.now()});
+    if(version!==presenceVersion || !connected || auth.currentUser?.uid!==uid){
+      await set(record,null).catch(()=>{});return;
+    }
+    connectionRef=record;
+  }catch(error){console.warn('Viewer presence unavailable',error)}
+  finally{presencePending=false;if(version!==presenceVersion && connected)connectPresence()}
+}
+onValue(ref(db,'.info/connected'),snap=>{
+  connected=snap.val()===true;
+  if(!connected){presenceVersion++;connectionRef=null;return}
+  connectPresence();
 });
+onAuthStateChanged(auth,()=>connectPresence());
+auth.authStateReady().then(()=>auth.currentUser || signInAnonymously(auth)).then(()=>connectPresence()).catch(error=>console.warn('Viewer sign-in unavailable',error));
+onValue(presenceRef,snap=>{el('viewers').textContent=snap.exists()?snap.size:0});
 
-// Keep the visible counter and battle/stats/viewers synchronized to active
-// Firebase presence records so the Host and Battle pages show the same count.
-let lastViewerCount=null;
-onValue(presenceRef,async snap=>{
-  const viewers=snap.exists()?snap.size:0;
-  el('viewers').textContent=viewers;
-  if(viewers===lastViewerCount)return;
-  lastViewerCount=viewers;
-  try{
-    await update(ref(db,'battle/stats'),{viewers});
-  }catch(err){
-    console.warn('Viewer stats sync unavailable',err);
-  }
-});
 function yt(url){const m=(url||'').match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|live\/|embed\/))([\w-]{11})/);return m?m[1]:null}
+function escapeHtml(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function artist(prefix,a){
   a=a||{}; el('name'+prefix).textContent=a.name||('Artist '+prefix); el('genre'+prefix).textContent=a.genre||'—';
   const box=el('frame'+prefix), id=yt(a.youtubeUrl);
-  box.innerHTML=id?`<iframe src="https://www.youtube.com/embed/${id}" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen title="${a.name||'Artist'} live stream"></iframe>`:'Stream ready';
+  box.innerHTML=id?`<iframe src="https://www.youtube.com/embed/${id}" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen title="${escapeHtml(a.name||'Artist')} live stream"></iframe>`:'Stream ready';
 }
 onValue(ref(db,'battle/live'),s=>{
   const b=s.val(), active=b&&b.status!=='ended';
