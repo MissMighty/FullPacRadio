@@ -10,6 +10,7 @@
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%;background:var(--black);color:var(--white);font-family:var(--fb);overflow-x:hidden}
 ::-webkit-scrollbar{width:3px}::-webkit-scrollbar-thumb{background:var(--gold)}
+[hidden]{display:none!important}
 .app{display:grid;grid-template-rows:60px 1fr;height:100vh}
 .topbar{background:var(--deep);border-bottom:1px solid var(--gb);display:flex;align-items:center;justify-content:space-between;padding:0 20px;gap:12px;flex-wrap:wrap}
 .tb-logo{font-family:var(--fd);font-size:20px;letter-spacing:3px}.tb-logo span{color:var(--gold)}
@@ -117,7 +118,19 @@ select{background:var(--card);border:1px solid var(--border);color:var(--white);
 </style>
 </head>
 <body>
-<div class="app">
+<section id="auth-panel" style="max-width:420px;margin:60px auto;padding:24px;border:1px solid var(--gb)">
+  <h1 style="margin-bottom:18px">Full PAC Host Sign In</h1>
+  <form id="host-login">
+    <label for="host-email">Email</label>
+    <input class="fi" id="host-email" type="email" autocomplete="username" required style="display:block;width:100%;margin:8px 0 16px"/>
+    <label for="host-password">Password</label>
+    <input class="fi" id="host-password" type="password" autocomplete="current-password" required style="display:block;width:100%;margin:8px 0 16px"/>
+    <button class="ab" id="login-button" type="submit">Sign in</button>
+  </form>
+  <p id="auth-status" role="status" aria-live="polite" style="margin-top:16px">Sign in with your authorized host account.</p>
+  <button class="abt" id="auth-signout" type="button" hidden style="margin-top:12px">Sign out</button>
+</section>
+<div class="app" id="host-app" hidden inert>
   <div class="topbar">
     <div><div class="tb-logo">FULL <span>PAC</span></div><div class="tb-sub">Host Control Room · Private Admin</div></div>
     <div class="tb-stats">
@@ -125,7 +138,7 @@ select{background:var(--card);border:1px solid var(--border);color:var(--white);
       <div class="tb-stat">🗳 <b id="stv">0</b> votes</div>
       <div class="tb-stat">🏆 <b id="stb">0</b> battles</div>
     </div>
-    <div style="display:flex;align-items:center;gap:10px"><a href="index.html" style="font-family:var(--fm);font-size:9px;letter-spacing:1px;color:var(--muted);text-decoration:none;border:1px solid var(--border);padding:4px 9px">← SITE</a><div class="live-ind"><span class="ld"></span> HOST ACTIVE</div></div>
+    <div style="display:flex;align-items:center;gap:10px"><a href="index.html" style="font-family:var(--fm);font-size:9px;letter-spacing:1px;color:var(--muted);text-decoration:none;border:1px solid var(--border);padding:4px 9px">← SITE</a><div class="live-ind"><span class="ld"></span> <span id="host-identity">HOST ACTIVE</span></div><button class="abt" id="host-signout" type="button">Sign out</button></div>
   </div>
   <div class="content">
     <div class="main">
@@ -208,24 +221,71 @@ select{background:var(--card);border:1px solid var(--border);color:var(--white);
 
 <script type="module">
 import{initializeApp}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import{getDatabase,ref,set,get,push,onValue,update,remove,serverTimestamp}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import{getDatabase,ref,set as rawSet,get,push as rawPush,onValue,update as rawUpdate,remove as rawRemove,serverTimestamp}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import{getAuth,onAuthStateChanged,signInWithEmailAndPassword,signOut,setPersistence,browserSessionPersistence}from"https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 const cfg={apiKey:"AIzaSyDBhhAl3L5NSy-vs6kqk4W8c2XMQnsaLP4",authDomain:"fullpacentertainment-73f8f.firebaseapp.com",databaseURL:"https://fullpacentertainment-73f8f-default-rtdb.firebaseio.com",projectId:"fullpacentertainment-73f8f",storageBucket:"fullpacentertainment-73f8f.firebasestorage.app",messagingSenderId:"680781752185",appId:"1:680781752185:web:4ceb73f0e73c1823be71a8"};
 const app=initializeApp(cfg);
 const db=getDatabase(app);
 const e=id=>document.getElementById(id);
 let timerSec=120,timerRunning=false,timerInt=null;
+const auth=getAuth(app);
+let approvedUid=null,accessUnsubscribe=null,sessionVersion=0;
+const hostUnsubscribes=[];
+const delayedActions=new Set();
+function isHost(){return !!auth.currentUser && auth.currentUser.uid===approvedUid}
+function requireHost(){if(!isHost())throw new Error('Host authorization required.');}
+// Every write, including listener and timer writes, goes through this gate.
+// Database Security Rules remain the authoritative protection against bypasses.
+function set(...args){requireHost();return rawSet(...args)}
+function update(...args){requireHost();return rawUpdate(...args)}
+function push(...args){requireHost();return rawPush(...args)}
+function remove(...args){requireHost();return rawRemove(...args)}
+function escapeHtml(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function stopHostSession(){
+  approvedUid=null;
+  clearInterval(timerInt);timerInt=null;timerRunning=false;
+  for(const pending of delayedActions)clearTimeout(pending);
+  delayedActions.clear();
+  while(hostUnsubscribes.length)hostUnsubscribes.pop()();
+  e('host-app').hidden=true;e('host-app').inert=true;e('auth-panel').hidden=false;
+  // Do not retain private queue/vote content after sign-out or role revocation.
+  e('live-panel').replaceChildren();e('ql').replaceChildren();e('vf').replaceChildren();e('annl').replaceChildren();
+}
+function hostListen(path,callback){
+  hostUnsubscribes.push(onValue(ref(db,path),snap=>{
+    if(!isHost())return;
+    callback(snap);
+  },()=>{stopHostSession();e('auth-status').textContent='Host data access was denied. Check your host permissions.'}));
+}
+function delayedHostAction(action,delay){
+  const uid=approvedUid,version=sessionVersion;
+  const pending=setTimeout(()=>{
+    delayedActions.delete(pending);
+    if(isHost() && approvedUid===uid && sessionVersion===version)action();
+  },delay);
+  delayedActions.add(pending);
+}
 
 function toast(msg,type='info'){const t=document.createElement('div');t.className=`toast ${type}`;t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.classList.add('show'),10);setTimeout(()=>{t.classList.remove('show');setTimeout(()=>t.remove(),300)},3000)}
 function timeAgo(ts){if(!ts)return'';const d=Math.floor((Date.now()-ts)/1000);return d<60?d+'s ago':d<3600?Math.floor(d/60)+'m ago':Math.floor(d/3600)+'h ago'}
 function updateTimer(){const m=Math.floor(timerSec/60),s=timerSec%60;const el=e('td');if(el){el.textContent=`${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;el.className='td'+(timerSec<=10&&timerRunning?' urgent':'')}}
 
-// LISTENERS
-onValue(ref(db,'battle/live'),snap=>{renderLive(snap.val())});
-onValue(ref(db,'battle/queue'),snap=>{renderQueue(snap.val())});
-onValue(ref(db,'battle/votes'),snap=>{renderVotes(snap.val())});
-onValue(ref(db,'battle/timer'),snap=>{const t=snap.val();if(t){timerSec=t.seconds||0;timerRunning=t.running||false;updateTimer()}});
-onValue(ref(db,'battle/announcements'),snap=>{renderAnns(snap.val())});
-onValue(ref(db,'battle/stats'),snap=>{const s=snap.val()||{};e('sv').textContent=s.viewers||0;e('stv').textContent=s.totalVotes||0;e('stb').textContent=s.battlesCompleted||0});
+// Listeners are attached only after a server-controlled host grant is confirmed.
+function startHostSession(){
+  e('host-app').hidden=false;e('host-app').inert=false;e('auth-panel').hidden=true;
+  e('host-identity').textContent=auth.currentUser.email||'HOST ACTIVE';
+  hostListen('battle/live',snap=>renderLive(snap.val()));
+  hostListen('battle/queue',snap=>renderQueue(snap.val()));
+  hostListen('battle/votes',snap=>renderVotes(snap.val()));
+  hostListen('battle/timer',snap=>{const t=snap.val();if(t){timerSec=t.seconds||0;timerRunning=t.running||false;updateTimer()}});
+  hostListen('battle/announcements',snap=>renderAnns(snap.val()));
+  hostListen('battle/stats',snap=>{const s=snap.val()||{};e('sv').textContent=s.viewers||0;e('stv').textContent=s.totalVotes||0;e('stb').textContent=s.battlesCompleted||0});
+  hostListen('battle/presence',snap=>{
+    const viewers=snap.exists()?snap.size:0;
+    e('sv').textContent=viewers;
+    update(ref(db,'battle/stats'),{viewers}).catch(()=>toast('Viewer stats could not be saved','warn'));
+  });
+}
 
 function renderLive(b){
   const p=e('live-panel');
@@ -233,15 +293,15 @@ function renderLive(b){
   p.innerHTML=`
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
     <div class="live-ind" style="display:flex;align-items:center;gap:5px"><span class="ld"></span><span style="font-family:var(--fm);font-size:9px;letter-spacing:2px;color:var(--red)">LIVE</span></div>
-    <span style="font-family:var(--fm);font-size:9px;letter-spacing:2px;color:var(--gold);background:var(--card);border:1px solid var(--gb);padding:2px 8px">${b.type||'Freestyle Battle'}</span>
-    <span style="font-family:var(--fm);font-size:9px;color:var(--muted);margin-left:auto">Round ${b.round||1}</span>
+    <span style="font-family:var(--fm);font-size:9px;letter-spacing:2px;color:var(--gold);background:var(--card);border:1px solid var(--gb);padding:2px 8px">${escapeHtml(b.type||'Freestyle Battle')}</span>
+    <span style="font-family:var(--fm);font-size:9px;color:var(--muted);margin-left:auto">Round ${escapeHtml(b.round||1)}</span>
   </div>
   <div class="stage">
     <div class="aslot${b.artistA?.active?' active':''}">
       <div class="aslot-live">● LIVE</div>
-      <div class="aav">${b.artistA?.emoji||'🎤'}</div>
-      <div class="an">${b.artistA?.name||'Artist A'}</div>
-      <div class="ag">${b.artistA?.genre||'—'}</div>
+      <div class="aav">${escapeHtml(b.artistA?.emoji||'🎤')}</div>
+      <div class="an">${escapeHtml(b.artistA?.name||'Artist A')}</div>
+      <div class="ag">${escapeHtml(b.artistA?.genre||'—')}</div>
       <div class="asc" id="sca">0</div><div class="al">VOTES</div>
       <div class="abts">
         <button class="abt go" onclick="window.setActive('A')">🎤 LIVE</button>
@@ -255,9 +315,9 @@ function renderLive(b){
     </div>
     <div class="aslot${b.artistB?.active?' active':''}">
       <div class="aslot-live">● LIVE</div>
-      <div class="aav">${b.artistB?.emoji||'🎤'}</div>
-      <div class="an">${b.artistB?.name||'Artist B'}</div>
-      <div class="ag">${b.artistB?.genre||'—'}</div>
+      <div class="aav">${escapeHtml(b.artistB?.emoji||'🎤')}</div>
+      <div class="an">${escapeHtml(b.artistB?.name||'Artist B')}</div>
+      <div class="ag">${escapeHtml(b.artistB?.genre||'—')}</div>
       <div class="asc" id="scb">0</div><div class="al">VOTES</div>
       <div class="abts">
         <button class="abt go" onclick="window.setActive('B')">🎤 LIVE</button>
@@ -281,13 +341,13 @@ function renderQueue(q){
   l.innerHTML=items.map(([id,a],i)=>`
   <div class="qi${i===0?' next':''}">
     <div class="qpos">${i===0?'▶':i+1}</div>
-    <div class="qav">${a.emoji||'🎤'}</div>
-    <div class="qinfo"><div class="qn">${a.name}</div><div class="qg">${a.genre||'—'} · ${a.style||'Freestyle'}</div></div>
-    <div class="qst ${a.status||'waiting'}">${a.status||'waiting'}</div>
+    <div class="qav">${escapeHtml(a.emoji||'🎤')}</div>
+    <div class="qinfo"><div class="qn">${escapeHtml(a.name)}</div><div class="qg">${escapeHtml(a.genre||'—')} · ${escapeHtml(a.style||'Freestyle')}</div></div>
+    <div class="qst ${escapeHtml(a.status||'waiting')}">${escapeHtml(a.status||'waiting')}</div>
     <div class="qacts">
-      <button class="qb up" onclick="window.moveUp('${id}')">↑</button>
-      <button class="qb pull" onclick="window.pullArtist('${id}')">▶ PULL</button>
-      <button class="qb rm" onclick="window.removeQ('${id}')">✕</button>
+      <button class="qb up" onclick="window.moveUp('${encodeURIComponent(id).replace(/'/g,'%27')}')">↑</button>
+      <button class="qb pull" onclick="window.pullArtist('${encodeURIComponent(id).replace(/'/g,'%27')}')">▶ PULL</button>
+      <button class="qb rm" onclick="window.removeQ('${encodeURIComponent(id).replace(/'/g,'%27')}')">✕</button>
     </div>
   </div>`).join('')
 }
@@ -309,8 +369,8 @@ function renderVotes(v){
   const f=e('vf');
   if(f){
     const r=Object.entries(v||{}).slice(-6).reverse();
-    f.innerHTML=r.map(([,x])=>`<div class="vfi"><span class="vc ${x.choice==='A'?'ca':'cb'}">${x.choice==='A'?'▲ A':'▲ B'}</span><span class="vu">${x.user||'Fan'}</span><span class="vt">${timeAgo(x.timestamp)}</span></div>`).join('')||'<div class="ae">No votes yet</div>';
-    update(ref(db,'battle/stats'),{totalVotes:va+vb});
+    f.innerHTML=r.map(([,x])=>`<div class="vfi"><span class="vc ${x.choice==='A'?'ca':'cb'}">${x.choice==='A'?'▲ A':'▲ B'}</span><span class="vu">${escapeHtml(x.user||'Fan')}</span><span class="vt">${timeAgo(x.timestamp)}</span></div>`).join('')||'<div class="ae">No votes yet</div>';
+    update(ref(db,'battle/stats'),{totalVotes:va+vb}).catch(()=>toast('Vote stats could not be saved','warn'));
   }
 }
 
@@ -318,7 +378,7 @@ function renderAnns(data){
   const l=e('annl');if(!l)return;
   if(!data){l.innerHTML='<div class="ae">No announcements</div>';return}
   const items=Object.entries(data).sort((a,b)=>b[1].timestamp-a[1].timestamp).slice(0,5);
-  l.innerHTML=items.map(([,a])=>`<div class="ai"><span class="at">${a.text}</span><span class="atm">${timeAgo(a.timestamp)}</span></div>`).join('')||'<div class="ae">No announcements</div>'
+  l.innerHTML=items.map(([,a])=>`<div class="ai"><span class="at">${escapeHtml(a.text)}</span><span class="atm">${timeAgo(a.timestamp)}</span></div>`).join('')||'<div class="ae">No announcements</div>'
 }
 
 // TIMER
@@ -326,10 +386,12 @@ window.startTimer=async()=>{
   if(timerRunning)return;
   timerRunning=true;
   await update(ref(db,'battle/timer'),{running:true,seconds:timerSec,startedAt:serverTimestamp()});
+  requireHost();
   timerInt=setInterval(()=>{
+    if(!isHost()){clearInterval(timerInt);timerInt=null;return}
     if(timerSec<=0){window.stopTimer();return}
     timerSec--;updateTimer();
-    update(ref(db,'battle/timer'),{seconds:timerSec});
+    update(ref(db,'battle/timer'),{seconds:timerSec}).catch(()=>{clearInterval(timerInt);timerInt=null;timerRunning=false;toast('Timer write denied','warn')});
   },1000);
 };
 window.stopTimer=async()=>{
@@ -360,7 +422,7 @@ window.pullArtist=async(id)=>{
   await remove(ref(db,`battle/queue/${id}`));
 };
 window.setActive=async(side)=>{
-  await update(ref(db,'battle/live'),{[`artist${side}.active`]:true,[`artist${side==='A'?'B':'A'}.active`]:false});
+  await update(ref(db,'battle/live'),{[`artist${side}/active`]:true,[`artist${side==='A'?'B':'A'}/active`]:false});
   toast(`Artist ${side} is now LIVE 🎤`);
 };
 window.muteA=async(side)=>{
@@ -381,7 +443,7 @@ window.declareWinner=async(side)=>{
   const cs=await get(ref(db,'battle/stats/battlesCompleted'));
   await update(ref(db,'battle/stats'),{battlesCompleted:(cs.val()||0)+1});
   toast(`🏆 ${w.name} declared WINNER!`,'success');
-  setTimeout(()=>window.endBattle(),3000);
+  delayedHostAction(()=>window.endBattle(),3000);
 };
 window.endBattle=async()=>{
   await set(ref(db,'battle/live'),null);
@@ -414,7 +476,56 @@ window.sendAnn=async()=>{
   await push(ref(db,'battle/announcements'),{text,timestamp:Date.now()});
   e('ann').value='';toast('Announcement sent 📢');
 };
+// Gate actions before reads and catch rejected writes instead of reporting success.
+for(const name of ['startTimer','stopTimer','resetTimer','pullArtist','setActive','muteA','nextRound','declareWinner','endBattle','moveUp','removeQ','addArtist','lockVotes','unlockVotes','clearVotes','sendAnn']){
+  const action=window[name];
+  window[name]=async(...args)=>{
+    try{
+      requireHost();
+      if(['setActive','muteA','declareWinner'].includes(name) && !['A','B'].includes(args[0]))throw new Error('Invalid artist slot.');
+      if(['pullArtist','moveUp','removeQ'].includes(name)){
+        args[0]=decodeURIComponent(args[0]);
+        if(typeof args[0]!=='string' || /[.#$\[\]\/]/.test(args[0]))throw new Error('Invalid queue identifier.');
+      }
+      await action(...args);
+    }catch(error){toast(isHost()?'Action could not be saved. Check Firebase permissions.':'Host sign-in required.','warn')}
+  };
+}
+e('host-login').addEventListener('submit',async event=>{
+  event.preventDefault();e('login-button').disabled=true;
+  e('auth-status').textContent='Signing in…';
+  try{
+    await setPersistence(auth,browserSessionPersistence);
+    await signInWithEmailAndPassword(auth,e('host-email').value.trim(),e('host-password').value);
+    e('host-password').value='';
+  }catch(error){e('auth-status').textContent='Sign-in failed. Check your account and Firebase sign-in setup.'}
+  finally{e('login-button').disabled=false}
+});
+async function hostSignOut(){
+  sessionVersion++;
+  if(accessUnsubscribe){accessUnsubscribe();accessUnsubscribe=null}
+  stopHostSession();e('auth-status').textContent='Signing out…';
+  try{await signOut(auth)}catch(error){e('auth-status').textContent='Sign-out failed. Close this tab and try again.'}
+}
+e('host-signout').addEventListener('click',hostSignOut);
+e('auth-signout').addEventListener('click',hostSignOut);
+onAuthStateChanged(auth,user=>{
+  const version=++sessionVersion;
+  if(accessUnsubscribe){accessUnsubscribe();accessUnsubscribe=null}
+  stopHostSession();e('auth-signout').hidden=!user;e('host-login').hidden=!!user;
+  if(!user){e('auth-status').textContent='Sign in with your authorized host account.';return}
+  e('auth-status').textContent='Checking host access…';
+  // Only the console/Admin SDK can grant hostAccess/<uid> = true.
+  accessUnsubscribe=onValue(ref(db,`hostAccess/${user.uid}`),snap=>{
+    if(version!==sessionVersion || auth.currentUser?.uid!==user.uid)return;
+    if(snap.val()===true){
+      if(approvedUid===user.uid)return;
+      approvedUid=user.uid;startHostSession();
+    }else{stopHostSession();e('auth-status').textContent='This account is not authorized to host.'}
+  },()=>{if(version!==sessionVersion)return;stopHostSession();e('auth-status').textContent='Host access could not be verified. Check Firebase rules.'});
+});
 timerSec=120;updateTimer();
 </script>
 </body>
 </html>
+
